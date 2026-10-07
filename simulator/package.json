@@ -1,0 +1,26 @@
+{
+  "name": "rider-gps-simulator",
+  "version": "1.0.0",
+  "description": "Phase 1 – Rider GPS Simulator for the Noida Live Delivery Tracking System",
+  "main": "src/simulator.js",
+  "scripts": {
+    "start": "node src/simulator.js",
+    "start:fast": "SPEED_MULTIPLIER=120 node src/simulator.js",
+    "start:loop": "ROUTE_LOOP=true SPEED_MULTIPLIER=60 node src/simulator.js",
+    "start:realtime": "SPEED_MULTIPLIER=1 SIMULATION_INTERVAL_MS=5000 node src/simulator.js"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "keywords": [
+    "gps",
+    "simulator",
+    "delivery",
+    "tracking",
+    "noida",
+    "nodejs"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {}
+}

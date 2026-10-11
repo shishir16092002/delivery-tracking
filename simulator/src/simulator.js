@@ -1,15 +1,16 @@
 'use strict';
 
 /**
- * simulator.js  —  Phase 1 entry point
+ * simulator.js  —  Phase 2 entry point
  *
  * Responsibilities:
  *   1. Load and validate the dataset
  *   2. Prompt the user for rider count
  *   3. Create a RoutePlayer per rider
  *   4. Drive a shared setInterval() tick loop
- *   5. Print GPS events to stdout
- *   6. Handle Ctrl+C gracefully
+ *   5. Print GPS events to stdout          (Phase 1 behaviour, unchanged)
+ *   6. POST GPS events to the backend      (Phase 2 addition)
+ *   7. Handle Ctrl+C gracefully
  *
  * This file orchestrates; it does not compute GPS coordinates itself.
  */
@@ -202,6 +203,61 @@ function buildProgressBar(progress, width) {
 }
 
 // ---------------------------------------------------------------------------
+// Backend HTTP client  (Phase 2)
+// ---------------------------------------------------------------------------
+
+// Track backend failures so we can report them in the shutdown summary.
+let backendFailures = 0;
+
+/**
+ * POST one GPS event to the backend.
+ *
+ * Design decisions:
+ *   - Uses Node 18+ built-in fetch — no extra dependency in the simulator.
+ *   - Fire-and-forget: we do NOT await this in the tick loop.  If we did,
+ *     100 riders × network latency per tick could slow the loop.
+ *   - Errors are caught and logged but NEVER crash the simulator.
+ *     GPS simulation must keep running even if the backend is temporarily down.
+ *   - We send only the fields the backend API expects.  The simulator's
+ *     internal fields (waypointIndex, localT, loopCount, etc.) are not sent.
+ *
+ * @param {object} event  – from RoutePlayer.tick()
+ */
+function postToBackend(event) {
+  const url  = `${config.BACKEND_URL}/api/v1/locations`;
+  const body = JSON.stringify({
+    riderId:   event.riderId,
+    routeId:   event.routeId,
+    latitude:  event.latitude,
+    longitude: event.longitude,
+    timestamp: event.timestamp,
+  });
+
+  fetch(url, {
+    method:  'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body,
+  })
+    .then(async (res) => {
+      if (!res.ok) {
+        backendFailures++;
+        const text = await res.text().catch(() => '');
+        console.error(`${C.red}[backend] POST ${res.status} — ${text.slice(0, 120)}${C.reset}`);
+      }
+    })
+    .catch((err) => {
+      backendFailures++;
+      // Only log the first failure and then every 10th to avoid spamming the console.
+      if (backendFailures === 1 || backendFailures % 10 === 0) {
+        console.error(
+          `${C.red}[backend] Cannot reach ${url} — ${err.message}` +
+          ` (failure #${backendFailures}, simulation continues)${C.reset}`
+        );
+      }
+    });
+}
+
+// ---------------------------------------------------------------------------
 // Graceful shutdown
 // ---------------------------------------------------------------------------
 
@@ -224,8 +280,9 @@ function shutdown(players) {
   const active    = players.filter(p => !p.completed).length;
 
   console.log(`  ${C.bold}Final status:${C.reset}`);
-  console.log(`    Riders completed: ${C.green}${completed}${C.reset}`);
-  console.log(`    Riders in-flight: ${C.yellow}${active}${C.reset}`);
+  console.log(`    Riders completed:      ${C.green}${completed}${C.reset}`);
+  console.log(`    Riders in-flight:      ${C.yellow}${active}${C.reset}`);
+  console.log(`    Backend POST failures: ${backendFailures > 0 ? C.red : C.green}${backendFailures}${C.reset}`);
   console.log('');
 
   process.exit(0);
@@ -236,13 +293,14 @@ function shutdown(players) {
 // ---------------------------------------------------------------------------
 
 async function main() {
-  banner('🛵  Rider GPS Simulator  —  Phase 1', C.cyan);
+  banner('🛵  Rider GPS Simulator  —  Phase 2', C.cyan);
 
   // --- Print active config ------------------------------------------------
   console.log(`${C.bold}Configuration:${C.reset}`);
   console.log(`  SIMULATION_INTERVAL_MS : ${C.yellow}${config.SIMULATION_INTERVAL_MS} ms${C.reset}`);
   console.log(`  SPEED_MULTIPLIER       : ${C.yellow}${config.SPEED_MULTIPLIER}×${C.reset}  (1 real second = ${config.SPEED_MULTIPLIER} simulated seconds)`);
   console.log(`  ROUTE_LOOP             : ${C.yellow}${config.ROUTE_LOOP}${C.reset}`);
+  console.log(`  BACKEND_URL            : ${C.yellow}${config.BACKEND_URL}${C.reset}`);
   console.log('');
 
   // --- Load dataset -------------------------------------------------------
@@ -308,8 +366,11 @@ async function main() {
 
       activeCount++;
 
-      // Print the GPS position event
+      // Print the GPS position event (Phase 1 behaviour — unchanged)
       printEvent(event);
+
+      // POST to the backend (Phase 2 addition)
+      postToBackend(event);
 
       // Print completion notice
       if (event._completed) {
@@ -333,6 +394,11 @@ async function main() {
 
       console.log('');
       banner('All riders have reached their destinations!', C.green);
+      if (backendFailures > 0) {
+        console.log(`  ${C.red}⚠  ${backendFailures} backend POST(s) failed — check that the backend is running.${C.reset}\n`);
+      } else {
+        console.log(`  ${C.green}✓  All events successfully sent to backend.${C.reset}\n`);
+      }
       process.exit(0);
     }
   }, config.SIMULATION_INTERVAL_MS);

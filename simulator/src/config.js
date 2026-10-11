@@ -8,8 +8,9 @@
  *
  * Environment variables:
  *   SIMULATION_INTERVAL_MS  – how often a GPS tick fires (default: 2000 ms)
- *   SPEED_MULTIPLIER        – compress real-world time (default: 1.0 = real-time)
+ *   SPEED_MULTIPLIER        – compress real-world time (default: 60× )
  *   ROUTE_LOOP              – 'true' restarts a rider after completing; 'false' stops it
+ *   BACKEND_URL             – Phase 2: URL of the Node.js backend (default: http://localhost:3000)
  */
 
 const config = {
@@ -43,6 +44,13 @@ const config = {
    * Do NOT change this unless you rename the file.
    */
   DATASET_PATH: '../data/noida_rider_routes_100.json',
+
+  /**
+   * Phase 2: URL of the Node.js backend.
+   * The simulator POSTs every GPS event here.
+   * Override with:  BACKEND_URL=http://your-server:3000
+   */
+  BACKEND_URL: process.env.BACKEND_URL ?? 'http://localhost:3000',
 };
 
 // --- Validation ----------------------------------------------------------

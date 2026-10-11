@@ -1,0 +1,14 @@
+# Node
+node_modules/
+npm-debug.log*
+
+# Secrets — never commit
+.env
+
+# Logs
+*.log
+logs/
+
+# OS
+.DS_Store
+Thumbs.db

@@ -1,0 +1,11 @@
+{
+  "name": "delivery-tracking-ui",
+  "version": "1.0.0",
+  "description": "Rider Live Location Tracking Map UI",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "keywords": ["map", "leaflet", "gps", "tracking", "rider"],
+  "license": "MIT"
+}

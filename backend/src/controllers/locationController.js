@@ -89,7 +89,11 @@ async function postLocation(req, res, next) {
       timestamp,
     });
 
-    return res.status(201).json({ success: true, message: 'Location stored successfully' });
+    return res.status(201).json({
+      success: true,
+      message: 'Location stored successfully',
+      speedMultiplier: runtimeConfig.speedMultiplier,
+    });
 
   } catch (err) {
     next(err); // hand off to centralized error handler in server.js
@@ -140,4 +144,69 @@ async function getRiderLocations(req, res, next) {
   }
 }
 
-module.exports = { postLocation, getRiderLocations };
+/**
+ * Return latest location for all active riders.
+ * GET /api/v1/locations/riders
+ */
+async function getAllRidersLatest(req, res, next) {
+  try {
+    const riders = await locationService.getLatestLocationsForAllRiders();
+    return res.json({
+      success: true,
+      count: riders.length,
+      riders,
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Dynamic Simulation Runtime Config
+// ---------------------------------------------------------------------------
+const runtimeConfig = {
+  speedMultiplier: 30, // default 30x
+  intervalMs: 2000,
+};
+
+function getConfig(req, res) {
+  res.json({
+    success: true,
+    ...runtimeConfig,
+  });
+}
+
+function updateConfig(req, res) {
+  const { speedMultiplier, intervalMs } = req.body ?? {};
+
+  if (speedMultiplier !== undefined) {
+    const s = parseFloat(speedMultiplier);
+    if (!isNaN(s) && s > 0 && s <= 500) {
+      runtimeConfig.speedMultiplier = s;
+      console.log(`[backend] ⚡ Simulation speed multiplier updated to ${s}x via API`);
+    } else {
+      return res.status(400).json({ success: false, error: 'speedMultiplier must be a number between 0.1 and 500' });
+    }
+  }
+
+  if (intervalMs !== undefined) {
+    const i = parseInt(intervalMs, 10);
+    if (!isNaN(i) && i >= 100) {
+      runtimeConfig.intervalMs = i;
+    }
+  }
+
+  return res.json({
+    success: true,
+    message: 'Simulation config updated',
+    ...runtimeConfig,
+  });
+}
+
+module.exports = {
+  postLocation,
+  getRiderLocations,
+  getAllRidersLatest,
+  getConfig,
+  updateConfig,
+};

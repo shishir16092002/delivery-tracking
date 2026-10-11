@@ -223,7 +223,7 @@ let backendFailures = 0;
  *
  * @param {object} event  – from RoutePlayer.tick()
  */
-function postToBackend(event) {
+function postToBackend(event, players = []) {
   const url  = `${config.BACKEND_URL}/api/v1/locations`;
   const body = JSON.stringify({
     riderId:   event.riderId,
@@ -243,6 +243,19 @@ function postToBackend(event) {
         backendFailures++;
         const text = await res.text().catch(() => '');
         console.error(`${C.red}[backend] POST ${res.status} — ${text.slice(0, 120)}${C.reset}`);
+      } else {
+        // Read response payload for dynamic runtime speed adjustments from UI
+        const data = await res.json().catch(() => null);
+        if (data && typeof data.speedMultiplier === 'number' && data.speedMultiplier > 0) {
+          if (data.speedMultiplier !== config.SPEED_MULTIPLIER) {
+            console.log(
+              `\n${C.yellow}${C.bold}  ⚡ Live speed updated from UI: ` +
+              `${config.SPEED_MULTIPLIER}× → ${data.speedMultiplier}×${C.reset}\n`
+            );
+            config.SPEED_MULTIPLIER = data.speedMultiplier;
+            players.forEach((p) => p.setSpeedMultiplier(data.speedMultiplier));
+          }
+        }
       }
     })
     .catch((err) => {
@@ -351,6 +364,19 @@ async function main() {
   process.on('SIGINT',  () => shutdown(players));
   process.on('SIGTERM', () => shutdown(players));
 
+  // --- Synchronize initial speed with backend if online ---
+  try {
+    const cfgRes = await fetch(`${config.BACKEND_URL}/api/v1/locations/config`).catch(() => null);
+    if (cfgRes && cfgRes.ok) {
+      const cfgData = await cfgRes.json().catch(() => null);
+      if (cfgData && typeof cfgData.speedMultiplier === 'number') {
+        config.SPEED_MULTIPLIER = cfgData.speedMultiplier;
+        players.forEach((p) => p.setSpeedMultiplier(cfgData.speedMultiplier));
+        console.log(`  ${C.green}✓${C.reset} Synchronized speed with backend: ${C.yellow}${config.SPEED_MULTIPLIER}×${C.reset}`);
+      }
+    }
+  } catch (_) {}
+
   // --- Tick loop ----------------------------------------------------------
   let allStopped = false;
 
@@ -369,8 +395,8 @@ async function main() {
       // Print the GPS position event (Phase 1 behaviour — unchanged)
       printEvent(event);
 
-      // POST to the backend (Phase 2 addition)
-      postToBackend(event);
+      // POST to the backend (Phase 2 addition + real-time speed sync)
+      postToBackend(event, players);
 
       // Print completion notice
       if (event._completed) {

@@ -15,6 +15,7 @@
 
 require('dotenv').config();
 
+const path           = require('path');
 const express        = require('express');
 const config         = require('./config');
 const pool           = require('./db/pool');
@@ -26,9 +27,16 @@ const app = express();
 // Middleware
 // ---------------------------------------------------------------------------
 
+// Permissive CORS for local developer tools and web dashboards
+app.use((req, res, next) => {
+  res.header('Access-Control-Allow-Origin', '*');
+  res.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept');
+  if (req.method === 'OPTIONS') return res.sendStatus(200);
+  next();
+});
+
 // Parse application/json request bodies.
-// Any request with a malformed JSON body will be caught below in the
-// SyntaxError branch of the error handler.
 app.use(express.json());
 
 // ---------------------------------------------------------------------------

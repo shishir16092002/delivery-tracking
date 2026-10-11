@@ -81,4 +81,22 @@ async function countLocationsByRider(riderId) {
   return parseInt(result.rows[0].total, 10);
 }
 
-module.exports = { insertLocation, getLocationsByRider, countLocationsByRider };
+/**
+ * Retrieve the latest known location for each rider in PostgreSQL.
+ * Powers the live map view showing all riders simultaneously.
+ */
+async function getLatestLocationsForAllRiders() {
+  const result = await pool.query(
+    `SELECT DISTINCT ON (rider_id)
+       rider_id  AS "riderId",
+       route_id  AS "routeId",
+       latitude,
+       longitude,
+       timestamp
+     FROM   rider_locations
+     ORDER  BY rider_id, timestamp DESC`,
+  );
+  return result.rows;
+}
+
+module.exports = { insertLocation, getLocationsByRider, countLocationsByRider, getLatestLocationsForAllRiders };

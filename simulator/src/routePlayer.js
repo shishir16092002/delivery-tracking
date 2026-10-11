@@ -106,6 +106,13 @@ class RoutePlayer {
   get label() {
     return `[${this.riderId}/${this.routeId}]`;
   }
+
+  /** Dynamically adjust speed multiplier at runtime without restarting */
+  setSpeedMultiplier(newMultiplier) {
+    if (typeof newMultiplier === 'number' && newMultiplier > 0) {
+      this.speedMultiplier = newMultiplier;
+    }
+  }
 }
 
 module.exports = RoutePlayer;

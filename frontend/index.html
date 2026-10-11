@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Rider Live Location & Delivery Tracking — Map UI</title>
+  
+  <!-- Leaflet Map CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+  <!-- Custom Application Styles -->
+  <link rel="stylesheet" href="./style.css">
+</head>
+<body>
+
+  <div id="app-container">
+    <!-- Map Viewport -->
+    <div id="map"></div>
+
+    <!-- Top Navigation Header -->
+    <header class="top-header">
+      <div class="brand glass-panel">
+        <div class="brand-icon">🛵</div>
+        <div>
+          <h1>Noida Rider Live GPS Tracker</h1>
+          <p>Phase 2: Ingestion & Live Map Visualization</p>
+        </div>
+      </div>
+
+      <div class="header-badges">
+        <div id="status-badge" class="badge badge-live glass-panel">
+          <span class="pulse-dot"></span> Connecting to Backend API...
+        </div>
+      </div>
+    </header>
+
+    <!-- Floating Dashboard Sidebar -->
+    <aside class="sidebar glass-panel">
+      <!-- Mode Selection -->
+      <div class="control-group">
+        <label class="control-label" for="mode-select">Data Source Mode</label>
+        <select id="mode-select">
+          <option value="backend" selected>🗄️ Live Backend Sync (PostgreSQL @ Port 3000)</option>
+          <option value="simulator">⚡ Offline Route Preview (Manual Demo)</option>
+        </select>
+      </div>
+
+      <!-- Rider Selection -->
+      <div class="control-group">
+        <label class="control-label" for="rider-select">Active Rider (Noida Routes)</label>
+        <select id="rider-select">
+          <option value="rider-001">rider-001 (Loading routes...)</option>
+        </select>
+      </div>
+
+      <!-- Real-Time Simulator Speed Control -->
+      <div class="control-group">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+          <label class="control-label" for="live-speed-select">⚡ Simulator Speed (Real-Time)</label>
+          <span id="speed-indicator" style="font-size:10px; color:#38bdf8; font-weight:700;">30×</span>
+        </div>
+        <select id="live-speed-select">
+          <option value="1">1× (Real-time speed)</option>
+          <option value="5">5× Speed</option>
+          <option value="15">15× Speed</option>
+          <option value="30" selected>30× Speed (Recommended)</option>
+          <option value="60">60× Speed (Fast)</option>
+          <option value="120">120× Speed (Hyper Fast)</option>
+        </select>
+        <p style="font-size:10px; color:var(--text-muted); margin-top:4px;">
+          Updates the active CLI simulator process dynamically.
+        </p>
+      </div>
+
+      <!-- Playback Controls (Visible in Offline Route Preview mode) -->
+      <div id="simulator-controls" class="control-group" style="display: none;">
+        <label class="control-label">Manual Preview Controls</label>
+        <div class="btn-group">
+          <button id="play-btn" class="btn btn-primary"><span>▶</span> Play Demo</button>
+          <button id="reset-btn" class="btn"><span>↺</span> Replay</button>
+        </div>
+      </div>
+
+      <!-- Telemetry Grid -->
+      <div class="control-group">
+        <div class="card-title">Live GPS Telemetry</div>
+        <div class="telemetry-grid">
+          <div class="telemetry-item">
+            <div class="telemetry-label">Latitude</div>
+            <div id="lat-display" class="telemetry-value">28.564200</div>
+          </div>
+          <div class="telemetry-item">
+            <div class="telemetry-label">Longitude</div>
+            <div id="lng-display" class="telemetry-value">77.334800</div>
+          </div>
+          <div class="telemetry-item">
+            <div class="telemetry-label">Avg Speed</div>
+            <div class="telemetry-value"><span id="speed-display">22</span><span class="telemetry-unit">km/h</span></div>
+          </div>
+          <div class="telemetry-item">
+            <div class="telemetry-label">Waypoint</div>
+            <div id="waypoint-index" class="telemetry-value">WP #1</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Progress Bar -->
+      <div class="progress-container">
+        <div class="progress-header">
+          <span>Route Progress</span>
+          <span id="progress-pct">0%</span>
+        </div>
+        <div class="progress-bar-bg">
+          <div id="progress-bar" class="progress-bar-fill"></div>
+        </div>
+      </div>
+
+      <!-- Route Landmarks -->
+      <div class="control-group" style="margin-top: 10px;">
+        <div class="card-title">Route Itinerary (<span id="route-id-badge">route-001</span>)</div>
+        <div class="route-info">
+          <div class="route-step">
+            <div class="step-bullet bullet-start"></div>
+            <div>
+              <div class="step-label">Pickup Hub</div>
+              <div id="start-name" class="step-name">Botanical Garden Metro</div>
+            </div>
+          </div>
+          <div class="route-step">
+            <div class="step-bullet bullet-end"></div>
+            <div>
+              <div class="step-label">Drop Destination</div>
+              <div id="dest-name" class="step-name">Noida Electronic City Metro</div>
+            </div>
+          </div>
+          <div style="display:flex; justify-content:space-between; margin-top:10px; padding-top:8px; border-top:1px solid var(--border-color); font-size:11px; color:var(--text-muted);">
+            <span>Est. Distance: <strong id="est-distance" style="color:#fff;">11.1 km</strong></span>
+            <span>Est. Duration: <strong id="est-duration" style="color:#fff;">30.8 min</strong></span>
+          </div>
+        </div>
+      </div>
+    </aside>
+
+    <!-- Floating Camera / Zoom Controls -->
+    <div class="floating-controls">
+      <button id="follow-btn" class="btn glass-panel btn-active">🎯 Tracking: ON</button>
+      <button id="center-btn" class="btn glass-panel">🗺️ Full Route View</button>
+    </div>
+  </div>
+
+  <!-- Leaflet Map JS -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+  <!-- Application Script -->
+  <script src="./app.js"></script>
+</body>
+</html>
